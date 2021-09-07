@@ -1,0 +1,145 @@
+---
+author: "Lucas Brito Dourado"
+title: "Prova 2 econometria"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+  word_document:
+    toc: yes
+    toc_depth: '3'
+  html_document:
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+date: "Última Edição `r format(Sys.time(), '%d %B %Y')`"
+---
+\newpage
+
+# Carregando os dados 
+
+```{r, echo=TRUE, warning=FALSE,message=FALSE,error=FALSE, EVAL=TRUE}
+
+#Carregando os pacotes
+
+library(tidyverse)
+library(quantmod)
+library(readxl)
+library(ggplot2)
+library(ggfortify)
+library(broom)
+
+#Carregando os dados
+
+Ibov <- getSymbols("^BVSP", from='2010-01-01',to='2018-12-31', auto.assign = FALSE, api_key="5sVdfSYMgwhhEZ_PCmxj") 
+# Indice ibovespa em reais.
+
+itsa4 <- getSymbols("ITSA4.SA", from='2010-01-01',to='2018-12-31', auto.assign = FALSE, api_key="5sVdfSYMgwhhEZ_PCmxj" )
+# preço de cotação da itausa s.a em reais.
+
+# combinando as séries em um data frame. 
+
+dados <- data.frame(Ibov, itsa4)
+
+```
+
+# Rodando o modelo de regressão
+Vamos rodar a regressão de itausa versus ibovespa, e iremos analisar o comportamento valor do 'fechamento' de ambas as variáveis no decorrer do recorte temporal entre 2010 e 2018
+
+```{r, echo=TRUE, warning=FALSE,message=FALSE,error=FALSE, EVAL=TRUE}
+mdl_itsa4_vs_ibov <- lm(itsa4$ITSA4.SA.Close ~ Ibov$BVSP.Close, data = dados)
+```
+
+# Construindo os gráficos de dispersão e regressão 
+
+```{r, echo=TRUE, warning=FALSE,message=FALSE,error=FALSE, EVAL=TRUE}
+# gráfico de dispersão
+ggplot(dados, aes(Ibov$BVSP.Close, itsa4$ITSA4.SA.Close)) +
+  geom_point(alpha = 0.5) 
+# gráfico de regressão
+ggplot(dados, aes(itsa4$ITSA4.SA.Close, Ibov$BVSP.Close)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE)
+
+```
+
+# Interpretação e análise da qualidade do modelo usando o teste F e o indicador R²
+
+```{r, echo=TRUE, warning=FALSE,message=FALSE,error=FALSE, EVAL=TRUE}
+# Sumário do modelo de regressão
+summary(mdl_itsa4_vs_ibov)
+```
+temos então no valor 0.0001299 ou 1.299e-04 o quanto aproximadamente a variável y, que é a variável resposta ou dependente varia em função de uma variação de x, ou seja, o quanto a itausa varia frente a uma variação do ibovespa.
+
+bx é coeficiente angular, a derivada de x, a inclinação da reta, a taxa de aumento de y em relação a x
+
+O intercepto -6.434e-01 é significativo, o intercepto é o ponto da reta de regressão onde x é igual a 0.
+
+temos ainda o teste F de resultado 1 em 4024 e 2222 graus de liberdade, com um p valor do teste f bem proximo a 0, conferindo credibilidade ao modelo. aqui quanto menor for o valor do teste f e maior o grau de liberdade melhor. 
+
+o r² demonstra moderada taxa de explicação da variável explicativa sobre a variavel dependente.
+
+# Visualisando a distribuição do erro para a análise da qualidade do ajuste da regressão.
+
+```{r, echo=TRUE, warning=FALSE,message=FALSE,error=FALSE, EVAL=TRUE}
+#Plotando os graficos das distribuições dos erros. 
+autoplot(mdl_itsa4_vs_ibov, which=1:3,nrow=3,ncol=1)
+
+# comparando o modelo original com o modelo sem considerar o intercepto. 
+
+mdl_itsa4_vs_ibov2 <- lm(itsa4$ITSA4.SA.Close ~ Ibov$BVSP.Close+0, data = dados)
+
+# erro aproximadamente normalmente distribuido
+
+```
+
+# Comparação com modelo sem o intercepto
+
+```{r, echo=TRUE, warning=FALSE,message=FALSE,error=FALSE, EVAL=TRUE}
+# novo modelo sem o intercepto 
+
+mdl_itsa4_vs_ibov2 <- lm(itsa4$ITSA4.SA.Close ~ Ibov$BVSP.Close+0, data = dados)
+
+summary(mdl_itsa4_vs_ibov2)
+
+autoplot(mdl_itsa4_vs_ibov2, which=1:3,nrow=3,ncol=1)
+# retirar o intercepto do modelo teve efeito somente sobre o indicador r² e o teste f, 
+# podendo levar a conclusões erradas acerca do acerto do modelo.
+
+# devido ao número de observações, não foi necessário modificar a escala do modelo. 
+
+```
+
+# Verificando a presença de outliers
+
+```{r, echo=TRUE, warning=FALSE,message=FALSE,error=FALSE, EVAL=TRUE}
+
+#Para os coeficientes do modelo
+tidy(mdl_itsa4_vs_ibov)
+
+# Performance do modelo
+glance(mdl_itsa4_vs_ibov)
+
+autoplot(mdl_itsa4_vs_ibov2, which=4:5,nrow=2,ncol=1)
+```
+Observa-se a presença de outliers a partir da observação de número 2000. Achei essa parte interessante porque não sei se devo considerar mesmo como outlier sabendo que nessa observação, foi a máxima historica do ibov e itsa4 devido aos ajustes macroeconomicos do GOV Temer e as consequentes mudanças nas espectativas futuras expressas no mercado. Creio que nesse caso são outliers em relação ao presente modelo, que considera apenas um recorte temporal restrito e que resvala nesta máxima histórica. Essa análise da presença de outliers foi feita com base fundamental no gráfico da distancia de Cook. 
+
+# Análise do erro padrão dos dois modelos
+```{r, echo=TRUE, warning=FALSE,message=FALSE,error=FALSE, EVAL=TRUE}
+# pegar o rse do modelo original
+mdl_itsa4_vs_ibov %>% 
+  # Get the model-level details
+  glance() %>% 
+  # Pull out sigma
+  pull(sigma)
+
+# rse do modelo sem o intercepto
+mdl_itsa4_vs_ibov2 %>% 
+  # Get the model-level details
+  glance() %>% 
+  # Pull out sigma
+  pull(sigma)
+
+# fiz por curiosidade, interessante que retirando o intercepto, a o modelo fica pior.

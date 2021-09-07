@@ -1,0 +1,95 @@
+---
+author: "Lucas Brito Dourado"
+title: "Prova 3 econometria"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+  word_document:
+    toc: yes
+    toc_depth: '3'
+  html_document:
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+date: "Última Edição `r format(Sys.time(), '%d %B %Y')`"
+---
+\newpage
+
+# Carregando os dados 
+
+```{r, echo=TRUE, warning=FALSE,message=FALSE,error=FALSE, EVAL=TRUE}
+# carregando pacotes e dados
+
+library(tidyverse)
+library(quantmod)
+library(ggplot2)
+library(ggfortify)
+
+
+#dados
+
+Ibov <- getSymbols("^BVSP", from='2010-01-01',to='2018-12-31',
+                   auto.assign = FALSE,
+                   api_key="5sVdfSYMgwhhEZ_PCmxj") 
+# Indice ibovespa em reais.
+
+Itsa4 <- getSymbols("ITSA4.SA", from='2010-01-01',to='2018-12-31',
+                    auto.assign = FALSE,
+                    api_key="5sVdfSYMgwhhEZ_PCmxj" )
+# preço de cotação da itausa s.a em reais.
+
+################################################################################
+# ajustes nos dados
+
+Ibov <- Cl(Ibov) # função 'Cl' para chamar apenas os dados do fechamento
+
+Itsa4 <- Cl(Itsa4)
+
+Dados <- data.frame(Ibov, Itsa4)
+################################################################################
+# carregando o modelo de regressão
+
+mdl_itsa4_vs_ibov <- lm(Itsa4 ~ as.vector(Ibov), data = Dados) # após muitas falhas
+# e muita pesquisa eu econtrei a solução para um erro que eu estava encontrando.
+# foram 6 dias de sofrimento, pra usar esse as.vector.
+# https://stackoverflow.com/questions/22337495/how-to-solve-predict-lm-error-variable-affinity-was-fitted-with-type-nmatr
+
+```
+
+# Criando data frame com 10 previsões baseadas no modelo de regressão
+
+```{r, echo=TRUE, warning=FALSE,message=FALSE,error=FALSE, eval=TRUE}
+
+dados_EX <- tibble(
+  Ibov = 40000:40010
+)
+# Adicionando as previsoes ao data frame
+PREVISÕES<-dados_EX %>%
+  mutate(
+    Itsa4=predict(mdl_itsa4_vs_ibov, dados_EX)
+  )
+# vendo a previsões
+PREVISÕES
+```
+
+# Plotando os graficos com as previsões
+
+```{r, echo=TRUE, warning=FALSE,message=FALSE,error=FALSE, eval=TRUE}
+ggplot(Dados, aes(Ibov, Itsa4)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  # Add a point layer of prediction data, colored yellow
+  geom_point(
+    data = PREVISÕES,
+    color = "yellow"
+  )
+```
+No gráfico podemos observar que o modelo preve que quando o indice ibovespa estiver por volta dos 40mil pontos, a itsa4 estará cotada proximo dos R$ 4,50. 
+
+# Interpretação do modelo
+
+O presente modelo de regressão linear busca compreender e tentar prever os comportamentos futuros da ação itsa4 em função de variações do indice ibovespa, fica clara a correlação entre os dois indices tendo em vista que a itsa4 tem elevado peso relativo no indice ibovespa, ou seja, quando existe um aumento ou diminuição do dado indice é bastante provavél que a ação acompanhe o movimento do indice na relação de itsa = ibov*0.0001299167. Apesar de o resultado ser aparentemente baixo é necessário levar em consideração que o indice ibovespa contém atualmente 80 ações, e que mudanças nas expectativas gerais do mercado podem afetar as cotações de ambas as cotações. 
+
